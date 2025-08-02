@@ -1,0 +1,36 @@
+# 主服务的地址
+host: "0.0.0.0"
+port: 9440
+workers: 1
+
+minio:
+  schema: false
+  cert_check: false
+  endpoint: 'localhost:9700'
+  sharepoint: 'localhost:9700'
+  access_key: minioadmin
+  secret_key: Adx@x76DB
+  bucket_name: cedc-smart-apps
+  tmp_bucket_name: cedc-smart-apps-tmp-dir
+
+redis_host: localhost
+redis_port: 7379
+redis_username: 'default'
+redis_password: '8x3g2sA'
+redis_db: 13
+#数据库配置
+database_type: mysql
+
+# MySQL数据库配置
+database_uri_mysql: localhost:9376/ict_training?charset=utf8mb4
+username_mysql: root
+password_mysql: ict@ls789
+
+
+
+
+# AI 任务服务配置 (结构化定义)
+ai_service:
+  base_url: "http://localhost:18203/v1"
+  key: "*I&U^Y%T4r3e2w1q"
+  model_name: "Qwen3-235B-A22B-Instruct-2507-FP8"

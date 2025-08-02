@@ -1,0 +1,6 @@
+#应用的配置
+env: local
+
+# CORS配置
+origins: ["*"]
+

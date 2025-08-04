@@ -2,7 +2,8 @@
 #  author: ict
 
 import json
-from typing import Dict
+from typing import Dict, List
+from datetime import datetime
 
 USER_CHAT_STATE = "CHAT_STATUS"
 USER_CHAT_STATE_TTL = 2 * 24 * 3600
@@ -27,6 +28,10 @@ class PaperTestStateProcessor:
     ACCESS_CODE_MAP_KEY = "ACCESS_CODE_MAP"  # 访问码映射
     USER_ANSWER_KEY = "USER_ANSWER"  # 用户答题缓存
     SHARED_PAPER_TTL = 7 * 24 * 3600  # 7天过期
+    
+    # 新增：用户文档相关缓存键前缀
+    USER_DOCUMENTS_KEY = "USER_DOCUMENTS"
+    USER_DOCUMENTS_TTL = 7 * 24 * 3600  # 7天过期
     
     def __init__(self, redis_client):
         self.redis_client = redis_client
@@ -182,4 +187,54 @@ class PaperTestStateProcessor:
             access_code: 访问码
         """
         cache_key = f"{self.ACCESS_CODE_MAP_KEY}:{access_code}"
+        self.redis_client.delete(cache_key)
+    
+    # 新增：用户文档管理相关方法
+    def save_user_documents(self, user_id: str, documents: List[Dict]) -> None:
+        """
+        保存用户使用的文档列表到Redis
+        
+        Args:
+            user_id: 用户ID
+            documents: 文档信息列表
+        """
+        cache_key = f"{self.USER_DOCUMENTS_KEY}:{user_id}"
+
+        existing_documents =[]
+        # 将新文档添加到现有列表中
+        for doc in documents:
+            doc_dict = doc.copy() if isinstance(doc, dict) else doc.dict()
+            # 添加时间戳
+            doc_dict['used_at'] = datetime.now().isoformat()
+            existing_documents.append(doc_dict)
+        # 保存到Redis
+        documents_str = json.dumps(existing_documents, ensure_ascii=False)
+        self.redis_client.set(cache_key, documents_str, ex=self.USER_DOCUMENTS_TTL)
+    
+    def get_user_documents(self, user_id: str) -> List[Dict]:
+        """
+        从Redis获取用户使用的文档列表
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            用户使用的文档列表
+        """
+        cache_key = f"{self.USER_DOCUMENTS_KEY}:{user_id}"
+        cached_data = self.redis_client.get(cache_key)
+        if cached_data:
+            # 刷新过期时间
+            self.redis_client.expire(cache_key, self.USER_DOCUMENTS_TTL)
+            return json.loads(cached_data)
+        return []
+    
+    def clear_user_documents(self, user_id: str) -> None:
+        """
+        清除用户文档缓存
+        
+        Args:
+            user_id: 用户ID
+        """
+        cache_key = f"{self.USER_DOCUMENTS_KEY}:{user_id}"
         self.redis_client.delete(cache_key)

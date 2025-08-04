@@ -23,16 +23,11 @@ redis_db: 12
 database_type: mysql
 
 # MySQL数据库配置
-database_uri_mysql: 172.18.1.7:9376/ict_document?charset=utf8mb4
+database_uri_mysql: 172.18.1.7:9376/ict_training?charset=utf8mb4
 username_mysql: root
 password_mysql: ict@ls789
 
-# 达梦数据库配置 (备用)
-database_uri: localhost:5237
-database_schema: ICT_DOCUMENT
-username: ICT_DOCUMENT
-password: Zdsj1030
-pool_size: 10
+
 
 # AI 任务服务配置 (结构化定义)
 ai_service:

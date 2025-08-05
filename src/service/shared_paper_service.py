@@ -78,6 +78,11 @@ class SharedPaperService:
             
             paper = self.paper_dao.create_paper(paper_data)
             
+            # 提取文档文件名列表
+            documents = []
+            if file_list:
+                documents = [file_info.get('file_name', '') for file_info in file_list]
+            
             # 保存到Redis缓存
             cache_data = {
                 'paper_id': paper_id,
@@ -85,7 +90,9 @@ class SharedPaperService:
                 'total_count': len(questions),
                 'access_code': access_code,
                 'user_id': user_id,
-                'created_at': datetime.now().isoformat()
+                'created_at': datetime.now().isoformat(),
+                'documents': documents,
+                'document_count': len(documents)
             }
             
             self.paper_processor.save_shared_paper(paper_id, cache_data)
@@ -131,7 +138,9 @@ class SharedPaperService:
                     'access_code': cached_data['access_code'],
                     'questions': frontend_questions,
                     'total_count': len(frontend_questions),
-                    'created_at': cached_data.get('created_at', '')
+                    'created_at': cached_data.get('created_at', ''),
+                    'documents': cached_data.get('documents', []),
+                    'document_count': cached_data.get('document_count', 0)
                 }
             
             # 从数据库获取
@@ -153,7 +162,9 @@ class SharedPaperService:
                 'total_count': paper.total_count,
                 'access_code': paper.access_code,
                 'user_id': paper.user_id,
-                'created_at': paper.created_at.isoformat() if paper.created_at else ''
+                'created_at': paper.created_at.isoformat() if paper.created_at else '',
+                'documents': [],  # 从数据库获取的试题可能没有文档信息
+                'document_count': 0
             }
             self.paper_processor.save_shared_paper(paper_id, cache_data)
             self.paper_processor.save_access_code_mapping(paper.access_code, paper_id)
@@ -163,7 +174,9 @@ class SharedPaperService:
                 'access_code': paper.access_code,
                 'questions': frontend_questions,
                 'total_count': len(frontend_questions),
-                'created_at': cache_data['created_at']
+                'created_at': cache_data['created_at'],
+                'documents': cache_data['documents'],
+                'document_count': cache_data['document_count']
             }
             
         except Exception as e:
@@ -296,6 +309,11 @@ class SharedPaperService:
             cached_data = self.paper_processor.get_user_answer(paper_id, user_id)
             if cached_data:
                 app_logger.info(f"从缓存获取用户答题结果: {cached_data}")
+                # 获取试题的文档信息
+                paper_data = self.paper_processor.get_shared_paper(paper_id)
+                if paper_data:
+                    cached_data['documents'] = paper_data.get('documents', [])
+                    cached_data['document_count'] = paper_data.get('document_count', 0)
                 return cached_data
             
             # 从数据库获取
@@ -327,6 +345,15 @@ class SharedPaperService:
                 'overall_feedback': user_answer.overall_feedback or '',
                 'submitted_at': user_answer.submitted_at.isoformat() if user_answer.submitted_at else ''
             }
+            
+            # 获取试题的文档信息
+            paper_data = self.paper_processor.get_shared_paper(paper_id)
+            if paper_data:
+                result_data['documents'] = paper_data.get('documents', [])
+                result_data['document_count'] = paper_data.get('document_count', 0)
+            else:
+                result_data['documents'] = []
+                result_data['document_count'] = 0
             
             # 重新缓存到Redis
             self.paper_processor.save_user_answer(paper_id, user_id, result_data)

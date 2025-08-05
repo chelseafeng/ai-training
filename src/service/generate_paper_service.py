@@ -242,7 +242,7 @@ def generate_training_questions(
             model=model_name,
             messages=messages,
             temperature=temperature,
-            max_tokens=max_tokens
+            # max_tokens=max_tokens
         )
         
         llm_end_time = time.time()

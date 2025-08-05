@@ -112,7 +112,8 @@ def calculate_question_score(analysis_task: Dict[str, Any]) -> Dict[str, Any]:
         # 多选题：用户答案应该是列表
         if isinstance(user_answer, str):
             # 如果是字符串，转换为列表（兼容旧格式）
-            user_options = set(user_answer.strip())
+            # 处理逗号分隔的字符串，如 "A,B,C,D"
+            user_options = set(user_answer.strip().split(','))
         elif isinstance(user_answer, list):
             # 如果是列表，直接使用
             user_options = set(user_answer)
@@ -128,18 +129,22 @@ def calculate_question_score(analysis_task: Dict[str, Any]) -> Dict[str, Any]:
         has_wrong_answer = len(user_options - correct_options) > 0
         # 检查是否答对了所有正确答案
         all_correct_answered = len(correct_options - user_options) == 0
+        # 计算答对的正确答案数量
+        correct_answered_count = len(user_options & correct_options)
+        # 计算正确答案总数
+        total_correct_count = len(correct_options)
         
         if has_wrong_answer:
             # 有一个错就是错，得0分
             is_correct = False
             score = 0.0
         elif all_correct_answered and len(user_options) == len(correct_options):
-            # 全对，得10分
+            # 全对且数量匹配，得10分
             is_correct = True
             score = base_score
-        elif all_correct_answered:
-            # 答对部分，得5分
-            is_correct = False
+        elif correct_answered_count > 0:
+            # 答对部分正确答案，给5分
+            is_correct = True
             score = 5.0
         else:
             # 其他情况，得0分

@@ -151,6 +151,9 @@ class GetPaperResponse(BaseModel):
     questions: List[QuestionForFrontend] = Field(..., description="题目列表（隐藏答案）")
     total_count: int = Field(..., description="题目总数")
     created_at: str = Field(..., description="创建时间")
+    # 新增：文档信息
+    documents: List[str] = Field(..., description="使用的文档文件名列表")
+    document_count: int = Field(..., description="文档总数")
 
 
 class SubmitAnswerRequest(BaseModel):
@@ -183,16 +186,6 @@ class GetResultResponse(BaseModel):
     total_count: int = Field(..., description="总题目数")
     overall_feedback: str = Field(..., description="整体评价")
     submitted_at: str = Field(..., description="提交时间")
-
-
-# 新增：用户文档列表相关的schemas
-class UserDocumentInfo(BaseModel):
-    """用户文档信息模型（只包含文件名）"""
-    file_name: str = Field(..., description="人类可读的文件名")
-
-
-class GetUserDocumentsResponse(BaseModel):
-    """获取用户文档列表响应模型"""
-    documents: List[UserDocumentInfo] = Field(..., description="文档列表")
-    total_count: int = Field(..., description="文档总数")
-    user_id: str = Field(..., description="用户ID") 
+    # 新增：文档信息
+    documents: List[str] = Field(..., description="使用的文档文件名列表")
+    document_count: int = Field(..., description="文档总数") 

@@ -28,8 +28,7 @@ from schemas.paper_schemas import (
     SubmitAnswerRequest,
     SubmitAnswerResponse,
     GetResultRequest,
-    GetResultResponse,
-    GetUserDocumentsResponse
+    GetResultResponse
 )
 from service.analyze_paper_service import analyze_paper_answers
 from service.generate_paper_service import generate_training_questions
@@ -37,7 +36,7 @@ from utils.redis_util import PaperTestStateProcessor
 from utils.paper_utils import hide_correct_answers, build_analysis_tasks_from_cache
 from utils.file_download_util import process_file_list
 from config.app_config import STATIC_FILE_PATH
-from schemas.paper_schemas import UserDocumentInfo
+
 
 router = APIRouter(prefix="/paper", tags=["培训考试题目"])
 
@@ -104,12 +103,6 @@ async def generate_paper(
 
         # 保存完整数据到缓存
         paper_processor.save_generated_paper(request.user_id, request.chat_id, cache_data.dict())
-
-        # 保存用户文档信息到缓存
-        if request.file_list:
-            # 将FileInfo对象转换为字典列表
-            file_dict_list = [file_info.dict() for file_info in request.file_list]
-            paper_processor.save_user_documents(request.user_id, file_dict_list)
 
         # 隐藏正确答案用于前端返回
         frontend_questions = hide_correct_answers(questions)
@@ -237,13 +230,6 @@ async def generate_shared_paper(
             file_list=file_list
         )
         
-        # 保存用户文档信息到缓存
-        if request.file_list and request.user_id:
-            paper_processor = PaperTestStateProcessor(redis_client)
-            file_dict_list = [file_info.dict() for file_info in request.file_list]
-            paper_processor.save_user_documents(request.user_id, file_dict_list)
-            log_config.app_logger.info(f"保存用户 {request.user_id} 的文档信息，共 {len(file_dict_list)} 个文档")
-        
         response_data = SharedPaperResponse(
             paper_id=result['paper_id'],
             access_code=result['access_code'],
@@ -296,7 +282,9 @@ async def get_shared_paper_by_id(
             access_code=result['access_code'],
             questions=result['questions'],
             total_count=result['total_count'],
-            created_at=result['created_at']
+            created_at=result['created_at'],
+            documents=result.get('documents', []),
+            document_count=result.get('document_count', 0)
         )
         
         return ApiSuccessResponse(
@@ -340,7 +328,9 @@ async def get_shared_paper_by_access_code(
             access_code=result['access_code'],
             questions=result['questions'],
             total_count=result['total_count'],
-            created_at=result['created_at']
+            created_at=result['created_at'],
+            documents=result.get('documents', []),
+            document_count=result.get('document_count', 0)
         )
         
         return ApiSuccessResponse(
@@ -444,7 +434,9 @@ async def get_shared_paper_result(
             correct_count=result['correct_count'],
             total_count=result['total_count'],
             overall_feedback=result['overall_feedback'],
-            submitted_at=result['submitted_at']
+            submitted_at=result['submitted_at'],
+            documents=result.get('documents', []),
+            document_count=result.get('document_count', 0)
         )
         
         return ApiSuccessResponse(
@@ -459,58 +451,5 @@ async def get_shared_paper_result(
         raise HTTPException(status_code=500, detail="获取答题结果时发生内部错误")
 
 
-# 新增：获取用户文档列表接口
-@router.get("/documents/{user_id}", response_model=ApiSuccessResponse[GetUserDocumentsResponse])
-async def get_user_documents(
-        user_id: str,
-        redis_client: Redis = Depends(get_redis_client)
-) -> ApiSuccessResponse[GetUserDocumentsResponse]:
-    """
-    获取用户使用的文档列表
-    
-    Args:
-        user_id: 用户ID
-        redis_client: Redis客户端依赖
-        
-    Returns:
-        用户使用的文档列表（按使用时间倒序）
-    """
-    try:
-        # 创建试卷状态处理器
-        paper_processor = PaperTestStateProcessor(redis_client)
-        
-        # 获取用户文档列表
-        documents_data = paper_processor.get_user_documents(user_id)
-        
-        if not documents_data:
-            # 如果没有找到文档信息，返回空列表
-            response_data = GetUserDocumentsResponse(
-                documents=[],
-                total_count=0,
-                user_id=user_id
-            )
-            return ApiSuccessResponse(
-                data=response_data,
-                message="用户暂无使用的文档"
-            )
-        
-        # 将字典数据转换为UserDocumentInfo对象
-        documents = [UserDocumentInfo(file_name=doc.get('file_name', '')) for doc in documents_data]
-        
-        response_data = GetUserDocumentsResponse(
-            documents=documents,
-            total_count=len(documents),
-            user_id=user_id
-        )
-        
-        log_config.app_logger.info(f"成功获取用户 {user_id} 的文档列表，共 {len(documents)} 个文档")
-        
-        return ApiSuccessResponse(
-            data=response_data,
-            message="获取用户文档列表成功"
-        )
-        
-    except Exception as e:
-        log_config.app_logger.error(f"获取用户文档列表失败: {str(e)}")
-        raise HTTPException(status_code=500, detail="获取文档列表时发生内部错误")
+
 

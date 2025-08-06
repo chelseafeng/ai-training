@@ -90,10 +90,11 @@ def calculate_question_score(analysis_task: Dict[str, Any]) -> Dict[str, Any]:
         # 找到用户选择的选项
         for option in options:
             if option.get('id', '') == user_answer:
-                is_correct = option.get('is_correct', False)
+                option_is_correct = option.get('is_correct', False)
+                is_correct = 1 if option_is_correct else 0
                 return {
                     'is_correct': is_correct,
-                    'score': base_score if is_correct else 0.0,
+                    'score': base_score if option_is_correct else 0.0,
                     'correct_answer': correct_answer,
                     'explanation': option.get('explanation', ''),
                     'chinese_type': chinese_type
@@ -101,7 +102,7 @@ def calculate_question_score(analysis_task: Dict[str, Any]) -> Dict[str, Any]:
         
         # 用户答案不在选项中
         return {
-            'is_correct': False,
+            'is_correct': 0,
             'score': 0.0,
             'correct_answer': correct_answer,
             'explanation': '答案格式错误',
@@ -136,19 +137,19 @@ def calculate_question_score(analysis_task: Dict[str, Any]) -> Dict[str, Any]:
         
         if has_wrong_answer:
             # 有一个错就是错，得0分
-            is_correct = False
+            is_correct = 0
             score = 0.0
         elif all_correct_answered and len(user_options) == len(correct_options):
             # 全对且数量匹配，得10分
-            is_correct = True
+            is_correct = 1
             score = base_score
         elif correct_answered_count > 0:
             # 答对部分正确答案，给5分
-            is_correct = True
+            is_correct = 2
             score = 5.0
         else:
             # 其他情况，得0分
-            is_correct = False
+            is_correct = 0
             score = 0.0
         
         return {
@@ -166,7 +167,7 @@ def calculate_question_score(analysis_task: Dict[str, Any]) -> Dict[str, Any]:
         correct_answer = ''.join(correct_options) if correct_options else ''
         
         return {
-            'is_correct': False,
+            'is_correct': 0,
             'score': 0.0,
             'correct_answer': correct_answer,
             'explanation': '未知题目类型',
@@ -225,7 +226,7 @@ def process_ai_analysis_results(ai_results: Dict[str, Any], analysis_tasks: List
         
         final_results.append(result)
         total_score += score_info['score']
-        if score_info['is_correct']:
+        if score_info['is_correct'] > 0:  # 有得分就算正确
             correct_count += 1
     
     # 生成整体反馈
@@ -234,15 +235,15 @@ def process_ai_analysis_results(ai_results: Dict[str, Any], analysis_tasks: List
     
     # 根据得分生成整体评价
     if total_score >= 90:
-        overall_feedback = "专业功底扎实,细节把控近乎完美!"
+        overall_feedback = "专业功底扎实，细节把控近乎完美!"
     elif total_score >= 80:
-        overall_feedback = "专业基础良好,对知识点掌握较为全面!"
+        overall_feedback = "专业基础良好，对知识点掌握较为全面!"
     elif total_score >= 70:
-        overall_feedback = "基本掌握相关知识,仍有提升空间!"
+        overall_feedback = "基本掌握相关知识，仍有提升空间!"
     elif total_score >= 60:
-        overall_feedback = "部分知识点掌握,需要加强学习!"
+        overall_feedback = "部分知识点掌握，需要加强学习!"
     else:
-        overall_feedback = "需要系统复习,建议重点关注错误题目!"
+        overall_feedback = "需要系统复习，建议重点关注错误题目!"
     
     return {
         'analysis_results': final_results,
@@ -288,23 +289,54 @@ def analyze_paper_answers(analysis_tasks: List[Dict[str, Any]], prompt_file: str
     ]
 
     try:
-        app_logger.info("正在调用大模型分析试题，请稍候...")
-        llm_start_time = time.time()
-        
-        response = client_check.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        
-        llm_end_time = time.time()
-        llm_duration = llm_end_time - llm_start_time
-        app_logger.info(f"大模型调用完成，耗时: {llm_duration:.2f}秒")
-        
-        result_text = response.choices[0].message.content
-        ai_results = json_repair.loads(result_text)
-        app_logger.info(f"LLM试卷分析原始输出: {result_text}")
+        # 第一次尝试
+        try:
+            app_logger.info("正在调用大模型分析试题，请稍候...")
+            llm_start_time = time.time()
+            
+            response = client_check.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            llm_end_time = time.time()
+            llm_duration = llm_end_time - llm_start_time
+            app_logger.info(f"大模型调用完成，耗时: {llm_duration:.2f}秒")
+            
+            result_text = response.choices[0].message.content
+            ai_results = json_repair.loads(result_text)
+            app_logger.info(f"LLM试卷分析原始输出: {result_text}")
+            
+        except Exception as e:
+            # 第一次失败，进行重试
+            app_logger.warning(f"JSON解析失败，准备重试: {str(e)}")
+            app_logger.info("重新调用大模型分析试题...")
+            
+            try:
+                # 重试一次
+                llm_start_time = time.time()
+                
+                response = client_check.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    # max_tokens=max_tokens
+                )
+                
+                llm_end_time = time.time()
+                llm_duration = llm_end_time - llm_start_time
+                app_logger.info(f"重试大模型调用完成，耗时: {llm_duration:.2f}秒")
+                
+                result_text = response.choices[0].message.content
+                ai_results = json_repair.loads(result_text)
+                app_logger.info(f"重试LLM试卷分析原始输出: {result_text}")
+                
+            except Exception as retry_e:
+                # 重试也失败，抛出异常
+                app_logger.error(f"重试后仍然失败，最终错误: {str(retry_e)}")
+                raise retry_e
         
         # 处理AI分析结果，结合评分逻辑
         app_logger.info("处理AI分析结果...")

@@ -235,23 +235,54 @@ def generate_training_questions(
     ]
 
     try:
-        app_logger.info("正在调用大模型生成试题，请稍候...")
-        llm_start_time = time.time()
-        
-        response = client_check.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            temperature=temperature,
-            # max_tokens=max_tokens
-        )
-        
-        llm_end_time = time.time()
-        llm_duration = llm_end_time - llm_start_time
-        app_logger.info(f"大模型调用完成，耗时: {llm_duration:.2f}秒")
-        
-        cleaned_text = response.choices[0].message.content
-        json_res = json_repair.loads(cleaned_text)
-        app_logger.info(f"LLM培训题目生成输出: {json_res}")
+        # 第一次尝试
+        try:
+            app_logger.info("正在调用大模型生成试题，请稍候...")
+            llm_start_time = time.time()
+            
+            response = client_check.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=temperature,
+                # max_tokens=max_tokens
+            )
+            
+            llm_end_time = time.time()
+            llm_duration = llm_end_time - llm_start_time
+            app_logger.info(f"大模型调用完成，耗时: {llm_duration:.2f}秒")
+            
+            cleaned_text = response.choices[0].message.content
+            json_res = json_repair.loads(cleaned_text)
+            app_logger.info(f"LLM培训题目生成输出: {json_res}")
+            
+        except Exception as e:
+            # 第一次失败，进行重试
+            app_logger.warning(f"JSON解析失败，准备重试: {str(e)}")
+            app_logger.info("重新调用大模型生成试题...")
+            
+            try:
+                # 重试一次
+                llm_start_time = time.time()
+                
+                response = client_check.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    # max_tokens=max_tokens
+                )
+                
+                llm_end_time = time.time()
+                llm_duration = llm_end_time - llm_start_time
+                app_logger.info(f"重试大模型调用完成，耗时: {llm_duration:.2f}秒")
+                
+                cleaned_text = response.choices[0].message.content
+                json_res = json_repair.loads(cleaned_text)
+                app_logger.info(f"重试LLM培训题目生成输出: {json_res}")
+                
+            except Exception as retry_e:
+                # 重试也失败，抛出异常
+                app_logger.error(f"重试后仍然失败，最终错误: {str(retry_e)}")
+                raise retry_e
         
         # 转换题目类型为中文
         app_logger.info("转换题目类型为中文...")

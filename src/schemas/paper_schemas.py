@@ -95,7 +95,7 @@ class QuestionAnalysis(BaseModel):
     question_type: str = Field(..., description="题目类型")
     question_text: str = Field(..., description="题目文本")
     user_answer: str | list = Field(..., description="用户答案（单选题为字符串，多选题为列表）")
-    is_correct: bool = Field(..., description="答案是否正确")
+    is_correct: int = Field(..., description="答案正确性：0=全错，1=全对，2=部分正确")
     score: float = Field(..., description="得分")
     correct_answer: str | list = Field(..., description="正确答案（单选题为字符串，多选题为列表）")
     explanation: str = Field(..., description="详细解释")
